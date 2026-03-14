@@ -164,6 +164,11 @@ function preprocessGLSL(glsl) {
   // Strip GLSL float-literal suffix: 0.5f → 0.5 (valid GLSL, invalid JS)
   code = code.replace(/(\d+\.\d*|\d*\.\d+|\d+)[fF]\b/g, '$1');
 
+  // Normalize trailing-dot float literals: 50. → 50.0 (valid GLSL, invalid JS)
+  // Must run after f-suffix strip. Only matches standalone number literals, not
+  // property accesses like vec2.add (guarded by \b before the digits).
+  code = code.replace(/\b(\d+)\.(?![0-9eE])/g, '$1.0');
+
   // Hoist fragColor as a global; remove the `out vec4 fragColor` parameter.
   // The transpiler emits in-place modification (fragColor[0]=r, …) rather than
   // reassignment, so the outer-scope Float32Array is updated via closure.
@@ -190,7 +195,9 @@ function preprocessGLSL(glsl) {
 function _fixMapThisArg(code) {
   return code.replace(
     /\.map\(function\s*\(_\)\s*\{return\s*_\s*([+\-*/])\s*this;\}/g,
-    '.map(function(_,__i){var __t=this;return _$1(__t instanceof Float32Array?__t[__i]:__t);})'
+    // Do NOT include the closing ) — the thisArg that follows (if any) still
+    // needs to close the .map() call.  Adding ) here creates an extra one.
+    '.map(function(_,__i){var __t=this;return _$1(__t instanceof Float32Array?__t[__i]:__t);}'
   );
 }
 
