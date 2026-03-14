@@ -77,8 +77,8 @@ Each example is annotated with comments explaining the concepts:
 
 ## Why this approach
 
-- **No dependencies, ever** — the project is intentionally vanilla JS. No npm, no bundler, no transpiler. Keep it that way.
-- **No transpiler dependency** — writing the runtime from scratch means every operation is inspectable and debuggable; there's no black-box translation layer
+- **No dependencies, ever** — the project is intentionally vanilla JS. No npm, no bundler. The one explicit exception is `glsl-transpiler`, loaded from `https://esm.sh/glsl-transpiler` at runtime for GLSL→JS transpilation. Do not add any other dependencies.
+- **GLSL is the only input format** — the editor accepts real Shadertoy-style GLSL (`void mainImage(out vec4 fragColor, in vec2 fragCoord)`). The JS-pseudocode mode has been removed.
 - **CPU-side execution** — running on CPU (instead of WebGL) is what makes pixel-level inspection possible; GPU shaders execute in parallel on hardware with no way to observe intermediate values
 - **Shadertoy-compatible API** — `mainImage` / `iResolution` / `iTime` naming means knowledge transfers directly to Shadertoy and other GLSL environments
 - **Single HTML file** — zero build step, zero dependencies, works offline, easy to serve with Deno (`deno run --allow-net --allow-read jsr:@std/http/file-server .`)

@@ -28,8 +28,10 @@ export function setResolution(r) {
 export function compileShader(code) {
   const wrapper = `
     "use strict";
-    return function mainImage(fragCoord, iResolution, iTime, _debugLog) {
+    return function mainImage(fragCoord, _iRes, _iTime, _debugLog) {
       function debug(label, value) { _debugLog(label, value); }
+      var iResolution = _iRes;
+      var iTime = _iTime;
       ${code}
     };
   `;

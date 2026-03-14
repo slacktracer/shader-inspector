@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head><title>glsl-transpiler probe</title></head>
+<body>
+<p>Open DevTools console to see transpiler output.</p>
+<script type="module">
+import GLSL from 'https://esm.sh/glsl-transpiler';
+
+const compile = GLSL({ includes: true });
+
+// Test 1: minimal mainImage with hoisted fragColor
+const test1 = `
+precision mediump float;
+uniform vec2 iResolution;
+uniform float iTime;
+vec4 fragColor;
+void mainImage(in vec2 fragCoord) {
+  fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+`;
+
+// Test 2: uv coords + uniforms
+const test2 = `
+precision mediump float;
+uniform vec2 iResolution;
+uniform float iTime;
+vec4 fragColor;
+void mainImage(in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution;
+  fragColor = vec4(uv.x, uv.y, 0.5, 1.0);
+}
+`;
+
+// Test 3: renamed stdlib — transpiler should pass unknown fn names through
+const test3 = `
+precision mediump float;
+uniform vec2 iResolution;
+vec4 fragColor;
+void mainImage(in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution;
+  float d = _g_length(uv) - 0.3;
+  float c = 1.0 - _g_smoothstep(-0.01, 0.01, d);
+  fragColor = vec4(c, c * 0.5, 0.0, 1.0);
+}
+`;
+
+console.log('=== TEST 1: minimal mainImage ===');
+try { console.log(compile(test1)); } catch(e) { console.error(e); }
+
+const compile2 = GLSL({ includes: true });
+console.log('\n=== TEST 2: uv coords + uniforms ===');
+try { console.log(compile2(test2)); } catch(e) { console.error(e); }
+
+const compile3 = GLSL({ includes: true });
+console.log('\n=== TEST 3: length + smoothstep ===');
+try { console.log(compile3(test3)); } catch(e) { console.error(e); }
+</script>
+</body>
+</html>

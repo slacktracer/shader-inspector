@@ -1,5 +1,6 @@
 import { EXAMPLES } from './examples.js';
-import { RES, setResolution, compileShader, renderShader } from './shader-runner.js';
+import { RES, setResolution, renderShader } from './shader-runner.js';
+import { compileGLSL } from './glsl-transpiler.js';
 import { updateInspector } from './inspector.js';
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -21,9 +22,9 @@ function showError(msg) {
   else { bar.classList.remove('visible'); }
 }
 
-function runShader() {
+async function runShader() {
   const code = document.getElementById('shader-code').value;
-  const { fn, error } = compileShader(code);
+  const { fn, error } = await compileGLSL(code);
   showError(error);
   if (!fn) return;
   compiledFn = fn;
@@ -65,13 +66,13 @@ function tick() {
   animFrame = requestAnimationFrame(tick);
 }
 
-animBtn.addEventListener('click', () => {
+animBtn.addEventListener('click', async () => {
   animating = !animating;
   if (animating) {
     startTime = performance.now() - lastITime * 1000;
     animBtn.classList.add('active');
     animBtn.textContent = '■ Stop';
-    const { fn, error } = compileShader(document.getElementById('shader-code').value);
+    const { fn, error } = await compileGLSL(document.getElementById('shader-code').value);
     showError(error);
     if (fn) { compiledFn = fn; animFrame = requestAnimationFrame(tick); }
   } else {

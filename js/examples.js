@@ -1,176 +1,160 @@
 export const EXAMPLES = {
   uv: `// UV Coordinates — classic first shader
-// fragCoord goes from (0,0) to (iResolution)
-// We normalize it to 0.0 → 1.0
+// fragCoord goes from (0,0) to iResolution (pixels)
+// Dividing normalizes it to the 0.0 → 1.0 range
 
-let uv = vdiv(fragCoord, iResolution);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  // Normalize to [0, 1]
+  vec2 uv = fragCoord / iResolution.xy;
 
-debug("uv", uv);
-debug("uv.x", uv.x);
-
-// R=x, G=y, B=0, A=1
-return vec4(uv.x, uv.y, 0.0, 1.0);`,
+  // R = x position, G = y position, B = constant
+  fragColor = vec4(uv.x, uv.y, 0.5, 1.0);
+}`,
 
   circle: `// Signed Distance Function — Circle
-// SDF returns: negative = inside, positive = outside
+// An SDF returns: negative = inside shape, positive = outside
+// The distance drives smooth edges via smoothstep
 
-let uv = vdiv(fragCoord, iResolution);
-let aspect = iResolution.x / iResolution.y;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float aspect = iResolution.x / iResolution.y;
 
-// Center UV and fix aspect ratio
-let p = vsub(uv, vec2(0.5));
-p = vec2(p.x * aspect, p.y);
+  // Center and correct aspect ratio
+  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
 
-debug("centered p", p);
+  // Circle SDF: distance to edge (negative inside, positive outside)
+  float d = length(p) - 0.3;
 
-// Circle SDF: d < 0 means we're inside
-let d = length(p) - 0.3;
+  // smoothstep creates a soft anti-aliased edge
+  float edge = smoothstep(0.01, -0.01, d);
 
-debug("SDF distance d", d);
+  vec3 bg  = vec3(0.05, 0.05, 0.10);
+  vec3 col = vec3(0.20, 0.70, 1.00);
+  vec3 res = mix(bg, col, edge);
 
-// Smooth edge with smoothstep
-let edge = smoothstep(0.01, -0.01, d);
-
-debug("edge value", edge);
-
-let col = mix(
-  vec3(0.05, 0.05, 0.1),   // background
-  vec3(0.2, 0.7, 1.0),     // circle color
-  edge
-);
-
-return vec4(col.x, col.y, col.z, 1.0);`,
+  fragColor = vec4(res.rgb, 1.0);
+}`,
 
   stripes: `// Stripes & Smoothstep
-// Shows how smoothstep creates anti-aliased edges
+// fract() repeats 0→1 continuously, creating a periodic pattern
+// smoothstep() gives an anti-aliased soft edge instead of a hard step
 
-let uv = vdiv(fragCoord, iResolution);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
 
-// Create repeating pattern
-let stripes = mod(uv.x * 10.0, 1.0);
+  // fract creates a sawtooth wave in x (repeating 0→1)
+  float stripe = fract(uv.x * 10.0);
 
-debug("raw stripe value", stripes);
+  // smoothstep: 0 below 0.45, 1 above 0.55, smooth in-between
+  float mask = smoothstep(0.45, 0.55, stripe);
 
-// Hard edge (aliased)
-//let mask = step(0.5, stripes);
+  vec3 a = vec3(0.05, 0.05, 0.15);
+  vec3 b = vec3(0.90, 0.50, 0.10);
+  vec3 res = mix(a, b, mask);
 
-// Soft edge (anti-aliased)
-let mask = smoothstep(0.45, 0.55, stripes);
-
-debug("smoothstep mask", mask);
-
-let col = mix(
-  vec3(0.05, 0.05, 0.15),
-  vec3(0.9, 0.5, 0.1),
-  mask
-);
-
-return vec4(col.x, col.y, col.z, 1.0);`,
+  fragColor = vec4(res.rgb, 1.0);
+}`,
 
   plasma: `// Plasma Wave — iTime animation
 // Try pressing ▶ Animate!
+// Summing sine waves with different frequencies and phases makes plasma
 
-let uv = vdiv(fragCoord, iResolution);
-let aspect = iResolution.x / iResolution.y;
-let p = vec2(uv.x * aspect, uv.y);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float aspect = iResolution.x / iResolution.y;
+  vec2 p = vec2(uv.x * aspect, uv.y);
 
-debug("uv", uv);
+  // Four overlapping sine waves
+  vec2 center = vec2(0.5 * aspect, 0.5);
+  float dist = length(p - center);
 
-let v1 = sin(p.x * 10.0 + iTime);
-let v2 = sin(p.y * 10.0 + iTime * 0.7);
-let v3 = sin((p.x + p.y) * 8.0 + iTime * 1.3);
-let v4 = sin(length(vsub(p, vec2(0.5, 0.5))) * 12.0 - iTime * 2.0);
+  float v  = sin(p.x * 10.0 + iTime);
+  v += sin(p.y * 10.0 + iTime * 0.70);
+  v += sin((p.x + p.y) * 8.0 + iTime * 1.30);
+  v += sin(dist * 12.0 - iTime * 2.0);
+  v /= 4.0;
 
-let plasma = (v1 + v2 + v3 + v4) / 4.0;
+  // Map the scalar to an RGB color using phase-shifted sines
+  float r = sin(v * 3.14159 + 0.000) * 0.5 + 0.5;
+  float g = sin(v * 3.14159 + 2.094) * 0.5 + 0.5;
+  float b = sin(v * 3.14159 + 4.189) * 0.5 + 0.5;
 
-debug("plasma value", plasma);
-
-// Map -1..1 to colors
-let r = sin(plasma * PI + 0.0) * 0.5 + 0.5;
-let g = sin(plasma * PI + 2.094) * 0.5 + 0.5;
-let b = sin(plasma * PI + 4.189) * 0.5 + 0.5;
-
-return vec4(r, g, b, 1.0);`,
+  fragColor = vec4(r, g, b, 1.0);
+}`,
 
   checkerboard: `// Checkerboard — mod and floor
-// Classic way to create grid patterns
+// floor(uv * N) gives integer cell indices
+// Adding x and y indices and taking mod 2 gives a checkerboard
 
-let uv = vdiv(fragCoord, iResolution);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
 
-let cells = 8.0;
-let gridUV = vmul(uv, cells);
+  // Scale uv to get 8×8 grid of cells
+  vec2 grid = uv * 8.0;
 
-debug("gridUV", gridUV);
+  // mod(floor(x) + floor(y), 2) alternates 0/1 across cells
+  float checker = mod(floor(grid.x) + floor(grid.y), 2.0);
 
-// mod 2 then floor gives alternating 0/1
-let checker = mod(
-  floor(gridUV.x) + floor(gridUV.y),
-  2.0
-);
+  vec3 dark  = vec3(0.08, 0.08, 0.12);
+  vec3 light = vec3(0.85, 0.85, 0.90);
+  vec3 res = mix(dark, light, checker);
 
-debug("checker value", checker);
-
-let col = mix(
-  vec3(0.08, 0.08, 0.12),
-  vec3(0.85, 0.85, 0.9),
-  checker
-);
-
-return vec4(col.x, col.y, col.z, 1.0);`,
+  fragColor = vec4(res.rgb, 1.0);
+}`,
 
   gradient: `// Radial Gradient + vignette
+// Measures distance from the center to create circular gradients
+// Multiplying by a vignette darkens the edges
 
-let uv = vdiv(fragCoord, iResolution);
-let aspect = iResolution.x / iResolution.y;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float aspect = iResolution.x / iResolution.y;
 
-// Distance from center
-let center = vec2(0.5, 0.5);
-let p = vsub(uv, center);
-p = vec2(p.x * aspect, p.y);
-let dist = length(p);
+  // Distance from center (aspect-corrected)
+  vec2 p = vec2(uv.x * aspect, uv.y) - vec2(0.5 * aspect, 0.5);
+  float dist = length(p);
 
-debug("dist from center", dist);
+  // Gradient: bright at center, dark at edges
+  float t = smoothstep(0.60, 0.0, dist);
 
-// Radial gradient
-let t = smoothstep(0.6, 0.0, dist);
+  vec3 inner = vec3(0.90, 0.40, 0.10);
+  vec3 outer = vec3(0.05, 0.03, 0.10);
+  vec3 col = mix(outer, inner, t);
 
-debug("radial t", t);
+  // Vignette: multiply by a radial falloff
+  float vignette = smoothstep(0.70, 0.20, dist);
+  col *= vignette;
 
-// Color bands
-let innerCol = vec3(0.9, 0.4, 0.1);
-let outerCol = vec3(0.05, 0.03, 0.1);
-let col = mix(outerCol, innerCol, t);
-
-// Vignette
-let vignette = smoothstep(0.7, 0.2, dist);
-col = vmul(col, vignette);
-
-return vec4(col.x, col.y, col.z, 1.0);`,
+  fragColor = vec4(col.rgb, 1.0);
+}`,
 
   normals: `// Normal Map Visualization
-// Encodes gradient directions as colors (like normal maps)
+// Approximates surface gradients and encodes them as RGB
+// This is how normal maps work: store (dx, dy, up) as color
 
-let uv = vdiv(fragCoord, iResolution);
-let aspect = iResolution.x / iResolution.y;
-let p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 uv = fragCoord / iResolution.xy;
+  float aspect = iResolution.x / iResolution.y;
 
-// A bumpy height field
-let h = sin(p.x * 12.0) * sin(p.y * 12.0) * 0.5 + 0.5;
+  // Aspect-correct centered coordinates
+  vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
 
-// Approximate gradient (partial derivatives)
-let eps = 0.01;
-let hx = sin((p.x + eps) * 12.0) * sin(p.y * 12.0) * 0.5 + 0.5;
-let hy = sin(p.x * 12.0) * sin((p.y + eps) * 12.0) * 0.5 + 0.5;
-let dhdx = (hx - h) / eps;
-let dhdy = (hy - h) / eps;
+  // A bumpy height field: two sine waves multiplied
+  float h  = sin(p.x * 12.0) * sin(p.y * 12.0) * 0.5 + 0.5;
 
-debug("height h", h);
-debug("gradient", vec2(dhdx, dhdy));
+  // Approximate partial derivatives (finite differences)
+  float eps = 0.005;
+  float hx = sin((p.x + eps) * 12.0) * sin(p.y * 12.0)        * 0.5 + 0.5;
+  float hy = sin(p.x * 12.0)        * sin((p.y + eps) * 12.0) * 0.5 + 0.5;
 
-// Normal from gradient (encode -1..1 → 0..1)
-let nx = dhdx * 0.5 + 0.5;
-let ny = dhdy * 0.5 + 0.5;
-let nz = 1.0; // pointing "up"
+  float dhdx = (hx - h) / eps;
+  float dhdy = (hy - h) / eps;
 
-return vec4(nx, ny, clamp(nz, 0.0, 1.0), 1.0);`,
+  // Encode gradient as normal: remap -1..1 → 0..1 for display
+  float nx = dhdx * 0.5 + 0.5;
+  float ny = dhdy * 0.5 + 0.5;
+  float nz = clamp(1.0, 0.0, 1.0);
+
+  fragColor = vec4(nx, ny, nz, 1.0);
+}`,
 };
