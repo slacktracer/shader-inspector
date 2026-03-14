@@ -71,11 +71,12 @@ Deno.test("renderShader: constant red fills all pixels", () => {
   }
 });
 
-Deno.test("renderShader: returns null when no inspect pixel", () => {
+Deno.test("renderShader: returns null log when no inspect pixel", () => {
   const { fn } = compileShader("return vec4(1, 1, 1, 1);");
   const ctx = makeCtx(4);
-  const log = renderShader(fn, 0, undefined, undefined, ctx, 4);
+  const { log, error } = renderShader(fn, 0, undefined, undefined, ctx, 4);
   assertEquals(log, null);
+  assertEquals(error, null);
 });
 
 Deno.test("renderShader: inspect log has correct fragCoord and result", () => {
@@ -83,7 +84,7 @@ Deno.test("renderShader: inspect log has correct fragCoord and result", () => {
   const res = 8;
   const ctx = makeCtx(res);
   // Inspect pixel (2, 3) in screen-space
-  const log = renderShader(fn, 0, 2, 3, ctx, res);
+  const { log } = renderShader(fn, 0, 2, 3, ctx, res);
   assertExists(log);
   // fragCoord follows GLSL convention: y is flipped
   assertEquals(log.fragCoord.x, 2.5);
@@ -101,7 +102,7 @@ Deno.test("renderShader: debug calls only captured for inspected pixel", () => {
   `);
   const res = 4;
   const ctx = makeCtx(res);
-  const log = renderShader(fn, 0, 1, 1, ctx, res);
+  const { log } = renderShader(fn, 0, 1, 1, ctx, res);
   assertExists(log);
   assertEquals(log.debug.length, 1);
   assertEquals(log.debug[0].label, "pos");
@@ -111,18 +112,18 @@ Deno.test("renderShader: iTime is forwarded to shader", () => {
   const { fn } = compileShader("return vec4(iTime, 0, 0, 1);");
   const res = 2;
   const ctx = makeCtx(res);
-  const log = renderShader(fn, 3.0, 0, 0, ctx, res);
+  const { log } = renderShader(fn, 3.0, 0, 0, ctx, res);
   assertExists(log);
   assertEquals(log.result.r, 3.0);
 });
 
-Deno.test("renderShader: runtime error in shader produces error color, not crash", () => {
-  // Calling length() on a number in a way that won't crash but produces pink error pixel
+Deno.test("renderShader: runtime error in shader returns error message and error color", () => {
   const { fn } = compileShader("throw new Error('boom'); return vec4(0,0,0,1);");
   const res = 2;
   const ctx = makeCtx(res);
-  // Should not throw
-  renderShader(fn, 0, -1, -1, ctx, res);
+  const { error } = renderShader(fn, 0, -1, -1, ctx, res);
+  // Error is surfaced in the return value
+  assert(error !== null && error.includes('boom'), `expected error message, got: ${error}`);
   // Error color is vec4(1, 0, 0.5, 1) → r=255, g=0, b=127, a=255
   assertEquals(ctx.data[0], 255);
   assertEquals(ctx.data[1], 0);

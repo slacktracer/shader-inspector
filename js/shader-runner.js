@@ -62,8 +62,10 @@ export function compileShader(code) {
 }
 
 // ctxOverride and resOverride allow tests to inject a fake canvas context.
+// Returns { log, error } — log is the inspect entry for the clicked pixel (or null),
+// error is the first runtime exception message (or null).
 export function renderShader(fn, iTime, inspectX, inspectY, ctxOverride, resOverride) {
-  if (!fn) return null;
+  if (!fn) return { log: null, error: null };
   const ctx = ctxOverride ?? _getCtx();
   const res = resOverride ?? RES;
 
@@ -71,6 +73,7 @@ export function renderShader(fn, iTime, inspectX, inspectY, ctxOverride, resOver
   const data      = imageData.data;
   const iRes      = rt.vec2(res, res);
   let inspectLog  = null;
+  let renderError = null;
 
   for (let py = 0; py < res; py++) {
     for (let px = 0; px < res; px++) {
@@ -86,7 +89,8 @@ export function renderShader(fn, iTime, inspectX, inspectY, ctxOverride, resOver
       let result;
       try {
         result = fn(fragCoord, iRes, iTime, debugLog);
-      } catch (_e) {
+      } catch (e) {
+        if (!renderError) renderError = e.message;
         result = rt.vec4(1, 0, 0.5, 1);
       }
 
@@ -104,5 +108,5 @@ export function renderShader(fn, iTime, inspectX, inspectY, ctxOverride, resOver
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return inspectLog;
+  return { log: inspectLog, error: renderError ? 'Runtime error: ' + renderError : null };
 }

@@ -25,13 +25,13 @@ function showError(msg) {
 async function runShader() {
   const code = document.getElementById('shader-code').value;
   const { fn, error } = await compileGLSL(code);
-  showError(error);
-  if (!fn) return;
+  if (error) { showError(error); return; }
   compiledFn = fn;
 
   const iTime   = animating ? (performance.now() - startTime) / 1000 : lastITime;
   const t0      = performance.now();
-  const log     = renderShader(fn, iTime, inspectPixel?.x, inspectPixel?.y);
+  const { log, error: renderError } = renderShader(fn, iTime, inspectPixel?.x, inspectPixel?.y);
+  showError(renderError);
   const elapsed = (performance.now() - t0).toFixed(1);
   document.getElementById('render-time').textContent = `${elapsed} ms`;
   if (log) updateInspector(log);
@@ -59,7 +59,8 @@ function tick() {
   const iTime   = (performance.now() - startTime) / 1000;
   lastITime     = iTime;
   const t0      = performance.now();
-  const log     = renderShader(compiledFn, iTime, inspectPixel?.x, inspectPixel?.y);
+  const { log, error: renderError } = renderShader(compiledFn, iTime, inspectPixel?.x, inspectPixel?.y);
+  if (renderError) showError(renderError);
   const elapsed = (performance.now() - t0).toFixed(1);
   document.getElementById('render-time').textContent = `${elapsed} ms`;
   if (log && inspectPixel) updateInspector(log);
@@ -98,7 +99,8 @@ function selectPixel(px, py) {
 
   if (compiledFn) {
     const iTime = animating ? (performance.now() - startTime) / 1000 : lastITime;
-    const log   = renderShader(compiledFn, iTime, px, py);
+    const { log, error: renderError } = renderShader(compiledFn, iTime, px, py);
+    if (renderError) showError(renderError);
     updateInspector(log);
   }
 }
